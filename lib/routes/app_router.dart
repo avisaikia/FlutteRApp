@@ -1,5 +1,4 @@
 import 'package:final_project/modules/admin/views/edit_user.dart';
-import 'package:final_project/modules/admin/views/user_details.dart';
 import 'package:final_project/modules/employee/views/employee_notify.dart';
 import 'package:final_project/modules/employee/views/employee_profile.dart';
 import 'package:final_project/modules/employee/views/leave_history.dart';
@@ -42,13 +41,7 @@ final GoRouter appRouter = GoRouter(
       path: '/create-user',
       builder: (_, __) => const UserCreationScreen(),
     ),
-    GoRoute(
-      path: '/user-details/:userId',
-      builder: (context, state) {
-        final userId = state.pathParameters['userId']!;
-        return UserDetailsScreen(userId: userId);
-      },
-    ),
+
     GoRoute(
       path: '/edit-user/:userId',
       builder: (context, state) {
@@ -68,7 +61,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/employee-profile',
-      builder: (_, __) => const EmployeeProfilePage(),
+      builder: (_, __) => EmployeeProfileScreen(),
     ),
     GoRoute(path: '/apply-leave', builder: (_, __) => const ApplyLeaveScreen()),
     GoRoute(

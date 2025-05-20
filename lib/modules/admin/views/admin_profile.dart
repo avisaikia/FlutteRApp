@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,19 +8,22 @@ class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  ProfileScreenState createState() => ProfileScreenState();
+  State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _dobController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
+  bool _showPasswordFields = false;
   DateTime? _selectedDate;
   File? _selectedImage;
   String? _profileImageUrl;
   late Future<void> _profileFuture;
-
   bool _isUpdated = false;
 
   @override
@@ -34,28 +36,24 @@ class ProfileScreenState extends State<ProfileScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
-    try {
-      final data =
-          await Supabase.instance.client
-              .from('admins')
-              .select('name, email, dob, profile_pic')
-              .eq('id', user.id)
-              .maybeSingle();
+    final data =
+        await Supabase.instance.client
+            .from('admins')
+            .select('name, email, dob, profile_pic')
+            .eq('id', user.id)
+            .maybeSingle();
 
-      if (data != null) {
-        _nameController.text = data['name'] ?? '';
-        _emailController.text = data['email'] ?? '';
-        if (data['dob'] != null) {
-          _selectedDate = DateTime.tryParse(data['dob']);
-          _dobController.text =
-              _selectedDate != null
-                  ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
-                  : '';
-        }
-        _profileImageUrl = data['profile_pic']; // 🔁 Fixed incorrect key
+    if (data != null) {
+      _nameController.text = data['name'] ?? '';
+      _emailController.text = data['email'] ?? '';
+      if (data['dob'] != null) {
+        _selectedDate = DateTime.tryParse(data['dob']);
+        _dobController.text =
+            _selectedDate != null
+                ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
+                : '';
       }
-    } catch (e) {
-      rethrow;
+      _profileImageUrl = data['profile_pic'];
     }
   }
 
@@ -66,7 +64,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
     );
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() {
         _selectedDate = picked;
         _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
@@ -86,13 +84,10 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _uploadProfileImage(String userId) async {
     if (_selectedImage == null) return;
-
     final filePath = 'profile_pic/$userId.jpg';
-    final storage = Supabase.instance.client.storage;
 
     try {
-      // Upload the image to Supabase Storage
-      await storage
+      await Supabase.instance.client.storage
           .from('profilepics')
           .upload(
             filePath,
@@ -100,20 +95,31 @@ class ProfileScreenState extends State<ProfileScreen> {
             fileOptions: const FileOptions(upsert: true),
           );
 
-      // Get the public URL of the uploaded file
-      final publicUrl = storage.from('profilepics').getPublicUrl(filePath);
-      print('Uploaded image URL: $publicUrl');
+      final publicUrl = Supabase.instance.client.storage
+          .from('profilepics')
+          .getPublicUrl(filePath);
 
       setState(() {
         _profileImageUrl = publicUrl;
         _isUpdated = true;
       });
     } catch (e) {
-      print('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload profile image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _updateProfile() async {
@@ -125,33 +131,82 @@ class ProfileScreenState extends State<ProfileScreen> {
         await _uploadProfileImage(user.id);
       }
 
-      // Ensure that the profile image URL is being updated correctly
       await Supabase.instance.client.from('admins').upsert({
         'id': user.id,
         'name': _nameController.text,
         'email': _emailController.text,
         'dob': _selectedDate?.toIso8601String(),
-        'profile_pic':
-            _profileImageUrl ?? '', // Ensure it's updated with the URL
+        'profile_pic': _profileImageUrl ?? '',
       });
 
+      if (_showPasswordFields) {
+        final newPassword = _newPasswordController.text.trim();
+        final confirmPassword = _confirmPasswordController.text.trim();
+
+        if (newPassword != confirmPassword) {
+          _showError('Passwords do not match.');
+          return;
+        }
+
+        if (newPassword.length < 6) {
+          _showError('Password must be at least 6 characters.');
+          return;
+        }
+
+        await Supabase.instance.client.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+        _showSuccess('Password updated successfully.');
+      }
+
       _isUpdated = true;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!')),
-      );
-
-      await Future.delayed(const Duration(milliseconds: 500));
+      _showSuccess('Profile updated successfully!');
       Navigator.pop(context, _isUpdated);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
+      _showError('Error updating profile: $e');
     }
+  }
+
+  Widget _buildModernInputField(
+    TextEditingController controller,
+    String label,
+    IconData icon,
+  ) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.grey[700]),
+        filled: true,
+        fillColor: const Color.fromARGB(255, 255, 255, 255),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 20,
+          horizontal: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: Colors.purple, // Purple outline color
+            width: 2, // Thickness of the outline
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.purple.shade700, width: 2),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.purple.shade300, width: 1.5),
+        ),
+        floatingLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return WillPopScope(
       onWillPop: () async {
         Navigator.pop(context, _isUpdated);
@@ -159,7 +214,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Admin Profile'),
+          title: const Text('Edit Profile'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.pop(context, _isUpdated),
@@ -172,70 +227,159 @@ class ProfileScreenState extends State<ProfileScreen> {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
               return Center(
-                child: Text('Failed to load profile: ${snapshot.error}'),
+                child: Text('Error loading profile: ${snapshot.error}'),
               );
             }
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               child: Column(
                 children: [
                   GestureDetector(
                     onTap: _pickImage,
-                    child: CircleAvatar(
-                      radius: 60,
-                      backgroundImage:
-                          _selectedImage != null
-                              ? FileImage(_selectedImage!)
-                              : (_profileImageUrl != null
-                                      ? NetworkImage(_profileImageUrl!)
-                                      : const AssetImage(
-                                        'assets/default_avatar.png',
-                                      ))
-                                  as ImageProvider,
-                      child: Align(
-                        alignment: Alignment.bottomRight,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.white,
-                          radius: 20,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundImage:
+                              _selectedImage != null
+                                  ? FileImage(_selectedImage!)
+                                  : (_profileImageUrl != null
+                                          ? NetworkImage(_profileImageUrl!)
+                                          : const AssetImage(
+                                            'assets/default_avatar.png',
+                                          ))
+                                      as ImageProvider,
+                          backgroundColor: Colors.grey[200],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: theme.colorScheme.primary,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(2, 2),
+                              ),
+                            ],
+                          ),
                           child: const Icon(
                             Icons.edit,
                             size: 20,
-                            color: Colors.blue,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _buildProfileField(_nameController, 'Name', Icons.person),
-                  const SizedBox(height: 16),
-                  _buildProfileField(_emailController, 'Email', Icons.email),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 36),
+                  _buildModernInputField(
+                    _nameController,
+                    'Full Name',
+                    Icons.person,
+                  ),
+                  const SizedBox(height: 20),
+                  _buildModernInputField(
+                    _emailController,
+                    'Email',
+                    Icons.email,
+                  ),
+                  const SizedBox(height: 20),
                   GestureDetector(
                     onTap: _pickDateOfBirth,
                     child: AbsorbPointer(
-                      child: _buildProfileField(
+                      child: _buildModernInputField(
                         _dobController,
                         'Date of Birth',
                         Icons.calendar_today,
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    initialValue: '****',
+                    enabled: false,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      prefixIcon: Icon(Icons.lock, color: Colors.grey[700]),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 20,
+                        horizontal: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.purple.shade300,
+                          width: 1.5,
+                        ),
+                      ),
+                      disabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.purple.shade300,
+                          width: 1.5,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: Colors.purple.shade700,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed:
+                          () => setState(
+                            () => _showPasswordFields = !_showPasswordFields,
+                          ),
+                      icon: Icon(
+                        _showPasswordFields ? Icons.close : Icons.edit,
+                        size: 18,
+                      ),
+                      label: Text(
+                        _showPasswordFields
+                            ? 'Cancel Password Change'
+                            : 'Change Password',
+                      ),
+                    ),
+                  ),
+                  if (_showPasswordFields) ...[
+                    _buildModernInputField(
+                      _newPasswordController,
+                      'New Password',
+                      Icons.lock_open,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildModernInputField(
+                      _confirmPasswordController,
+                      'Confirm Password',
+                      Icons.lock_outline,
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   const SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _updateProfile,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Update Profile'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _updateProfile,
+                      icon: const Icon(Icons.save),
+                      label: const Text('Save Changes'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      backgroundColor: Colors.blueAccent,
                     ),
                   ),
                 ],
@@ -243,23 +387,6 @@ class ProfileScreenState extends State<ProfileScreen> {
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildProfileField(
-    TextEditingController controller,
-    String label,
-    IconData icon,
-  ) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: Colors.blue[50],
       ),
     );
   }

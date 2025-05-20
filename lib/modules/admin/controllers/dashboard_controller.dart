@@ -9,6 +9,10 @@ class DashboardController extends ChangeNotifier {
   int totalManagers = 0;
 
   final AdminRepository _repo = AdminRepository();
+
+  List<AdminUserModel> _allUsers = [];
+  List<AdminUserModel> get allUsers => _allUsers;
+
   List<AdminUserModel> _recentUsers = [];
   List<AdminUserModel> get recentUsers => _recentUsers;
 
@@ -18,27 +22,33 @@ class DashboardController extends ChangeNotifier {
 
   Future<void> loadDashboardData() async {
     try {
-      final users = await _repo.getUsers();
+      _allUsers = await _repo.getUsers();
 
-      totalUsers = users.length;
-      totalEmployees = users.where((user) => user.role == 'employee').length;
-      totalManagers = users.where((user) => user.role == 'manager').length;
+      totalUsers = _allUsers.length;
+      totalEmployees =
+          _allUsers
+              .where((user) => user.role.toLowerCase() == 'employee')
+              .length;
+      totalManagers =
+          _allUsers
+              .where((user) => user.role.toLowerCase() == 'manager')
+              .length;
       _recentUsers = await fetchRecentUsers();
 
       notifyListeners();
     } catch (e) {
-      print('Error loading dashboard data: $e');
+      debugPrint('Error loading dashboard data: $e');
     }
   }
 
   Future<void> createUser(AdminUserModel user) async {
     await _repo.createUser(user);
-    await loadDashboardData(); // Refresh counts after new user is added
+    await loadDashboardData(); // Refresh counts and list after new user is added
   }
 
   Future<void> deleteUser(String userId) async {
     await _repo.deleteUser(userId);
-    await loadDashboardData(); // Refresh after deletion
+    await loadDashboardData(); // Refresh list and counts after deletion
   }
 
   Future<List<AdminUserModel>> fetchRecentUsers() async {
@@ -52,6 +62,4 @@ class DashboardController extends ChangeNotifier {
         .map((json) => AdminUserModel.fromJson(json))
         .toList();
   }
-
-  Future<List<AdminUserModel>> fetchAllUsers() => _repo.getUsers();
 }

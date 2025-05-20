@@ -57,6 +57,7 @@ class ManagerDashboardProvider extends ChangeNotifier {
         .eq('is_read', false);
 
     unreadNotificationCount = response.length;
+    notifyListeners();
   }
 
   Future<void> markAllNotificationsAsRead() async {

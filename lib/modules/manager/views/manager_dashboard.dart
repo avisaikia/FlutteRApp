@@ -52,6 +52,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.notifications_none),
+
                     onPressed: () async {
                       await provider.markAllNotificationsAsRead();
                       context.go('/manager-notify/${provider.managerUserId}');
@@ -68,15 +69,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                     ),
                 ],
               ),
-              GestureDetector(
-                onTap: () => context.go('/manager-profile'),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: CircleAvatar(
-                    backgroundImage: AssetImage('assets/profile_picture.png'),
-                  ),
-                ),
-              ),
+              SizedBox(width: 7),
             ],
           ),
           drawer: const ManagerNavigationDrawer(),

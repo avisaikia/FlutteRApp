@@ -5,7 +5,7 @@ class LeaveRequestModel {
   final String leaveType;
   final String startDate;
   final String endDate;
-  final String reason;
+
   final String status;
 
   final DateTime createdAt;
@@ -17,7 +17,6 @@ class LeaveRequestModel {
     required this.leaveType,
     required this.startDate,
     required this.endDate,
-    required this.reason,
 
     this.status = 'Pending',
     DateTime? createdAt,
@@ -30,7 +29,7 @@ class LeaveRequestModel {
     'leave_type': leaveType,
     'start_date': startDate,
     'end_date': endDate,
-    'reason': reason,
+
     'status': status,
 
     'created_at': createdAt.toIso8601String(),

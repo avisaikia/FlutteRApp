@@ -68,4 +68,21 @@ class SessionHelper {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('logged_in_email');
   }
+
+  static final ValueNotifier<String?> profilePicNotifier =
+      ValueNotifier<String?>(null);
+
+  static Future<void> saveProfilePicUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    final oldUrl = prefs.getString('profile_pic_url');
+    if (oldUrl != url) {
+      await prefs.setString('profile_pic_url', url);
+      profilePicNotifier.value = url;
+    }
+  }
+
+  static Future<String?> getProfilePicUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('profile_pic_url');
+  }
 }

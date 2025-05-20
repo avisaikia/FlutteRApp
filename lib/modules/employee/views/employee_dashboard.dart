@@ -1,8 +1,13 @@
 import 'package:final_project/core/services/shared_preferences.dart';
+import 'package:final_project/modules/employee/controllers/employee_dash_provider.dart';
+import 'package:final_project/modules/employee/views/employee_profile.dart';
+
 import 'package:final_project/modules/employee/widgets/employee_navbar.dart';
+
+import 'package:final_project/modules/employee/widgets/leave_balance_card.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 
 class EmployeeDashboard extends StatefulWidget {
   const EmployeeDashboard({super.key});
@@ -12,226 +17,164 @@ class EmployeeDashboard extends StatefulWidget {
 }
 
 class _EmployeeDashboardState extends State<EmployeeDashboard> {
-  final supabase = Supabase.instance.client;
-  String? employeeUserId;
-  int unreadNotificationCount = 0;
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    loadEmployeeIdAndNotifications();
-  }
-
-  Future<void> loadEmployeeIdAndNotifications() async {
-    final id = await SessionHelper.getUserId();
-    if (id != null) {
-      setState(() {
-        employeeUserId = id;
-      });
-      await fetchUnreadNotificationCount();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialize();
+      _initialized = true;
     }
   }
 
-  Future<void> fetchUnreadNotificationCount() async {
-    if (employeeUserId == null) return;
+  Future<void> _initialize() async {
+    final userId = await SessionHelper.getUserId();
+    if (userId != null) {
+      final dashboardProvider = Provider.of<EmployeeDashboardProvider>(
+        context,
+        listen: false,
+      );
+      await dashboardProvider.initialize(userId);
 
-    final response = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('recipient_id', employeeUserId!)
-        .eq('role', 'employee')
-        .eq('is_read', false);
+      final profileProvider = Provider.of<EmployeeProfileProvider>(
+        context,
+        listen: false,
+      );
+      await profileProvider.loadProfile();
 
-    if (mounted) {
-      setState(() {
-        unreadNotificationCount = response.length;
-      });
-    }
-  }
-
-  Future<void> markAllNotificationsAsRead() async {
-    if (employeeUserId == null) return;
-
-    await Supabase.instance.client
-        .from('notifications')
-        .update({'is_read': true})
-        .eq('recipient_id', employeeUserId!)
-        .eq('role', 'employee')
-        .eq('is_read', false);
-
-    if (mounted) {
-      setState(() {
-        unreadNotificationCount = 0;
-      });
+      if (mounted) setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Employee Dashboard'),
-        actions: [
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none),
-                tooltip: 'Notifications',
-                onPressed: () async {
-                  if (employeeUserId != null) {
-                    // Mark notifications as read and clear badge immediately
-                    await markAllNotificationsAsRead();
-                    // Navigate after clearing count
-                    context.go('/employee-notify/$employeeUserId');
-                  }
-                },
-              ),
-              if (unreadNotificationCount > 0)
-                Positioned(
-                  right: 11,
-                  top: 11,
-                  child: IgnorePointer(
-                    ignoring: true, // makes the badge not block taps
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 18,
-                        minHeight: 18,
-                      ),
-                      child: Text(
-                        '$unreadNotificationCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                        textAlign: TextAlign.center,
+    return Consumer<EmployeeDashboardProvider>(
+      builder: (context, provider, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Employee Dashboard'),
+            actions: [
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none),
+                    onPressed: () async {
+                      await provider.markAllNotificationsAsRead();
+                      context.go('/employee-notify/${provider.userId}');
+                    },
+                  ),
+                  if (provider.unreadNotificationCount > 0)
+                    Positioned(
+                      right: 11,
+                      top: 11,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: _buildBadge(provider.unreadNotificationCount),
                       ),
                     ),
-                  ),
-                ),
+                ],
+              ),
+              const SizedBox(width: 7),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: GestureDetector(
-              onTap: () => context.go('/employee-profile'),
-              child: const CircleAvatar(
-                backgroundImage: AssetImage('assets/profile_picture.png'),
-              ),
-            ),
-          ),
-        ],
-      ),
-      drawer: const EmployeeNavigationDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            const Text(
-              'Welcome Back!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: const [
-                    LeaveStat(title: "Taken", value: "4"),
-                    LeaveStat(title: "Remaining", value: "10"),
-                    LeaveStat(title: "Pending", value: "2"),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _DashboardActionCard(
-                    icon: Icons.note_add,
-                    label: 'Apply for Leave',
-                    onTap: () => context.go('/apply-leave'),
+          drawer: const EmployeeNavigationDrawer(),
+          body:
+              provider.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (provider.leaveBalance != null)
+                        LeaveBalanceCard(leaveBalance: provider.leaveBalance!),
+
+                      const SizedBox(height: 20),
+
+                      _buildActionCard(
+                        icon: Icons.note_add,
+                        label: 'Apply for Leave',
+                        onTap: () async {
+                          if (!mounted) return;
+                          final result = await context.push('/apply-leave');
+                          FocusScope.of(context).unfocus();
+                          if (result == true &&
+                              mounted &&
+                              provider.userId != null) {
+                            await provider.fetchLeaveBalance(provider.userId!);
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      _buildActionCard(
+                        icon: Icons.history,
+                        label: 'Leave History',
+                        onTap: () async {
+                          final result = await context.push('/leave-history');
+                          if (result == true &&
+                              mounted &&
+                              provider.userId != null) {
+                            await provider.fetchLeaveBalance(provider.userId!);
+                          }
+                        },
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _DashboardActionCard(
-                    icon: Icons.history,
-                    label: 'Leave History',
-                    onTap: () => context.go('/leave-history'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
+
+  Widget _buildBadge(int count) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: Colors.red,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+    child: Text(
+      '$count',
+      style: const TextStyle(color: Colors.white, fontSize: 12),
+      textAlign: TextAlign.center,
+    ),
+  );
+
+  Widget _buildActionCard({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) => Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      onTap: onTap,
+      child: SizedBox(
+        height: 150,
+        child: Center(child: _ActionCardContent(icon: icon, label: label)),
+      ),
+    ),
+  );
 }
 
-class LeaveStat extends StatelessWidget {
-  final String title;
-  final String value;
+class _ActionCardContent extends StatelessWidget {
+  const _ActionCardContent({required this.icon, required this.label});
 
-  const LeaveStat({super.key, required this.title, required this.value});
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(title, style: const TextStyle(color: Colors.grey)),
+        Icon(icon, size: 40, color: Theme.of(context).primaryColor),
+        const SizedBox(height: 12),
+        Text(label, style: const TextStyle(fontSize: 16)),
       ],
-    );
-  }
-}
-
-class _DashboardActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _DashboardActionCard({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 3,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 32, color: Theme.of(context).primaryColor),
-              const SizedBox(height: 8),
-              Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

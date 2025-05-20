@@ -35,7 +35,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen> {
       final response = await supabase
           .from('leave_requests')
           .select(
-            'id, status, start_date, end_date, reason, employee:users!leave_requests_employee_id_fkey(name)',
+            'id, status, start_date, end_date,  employee:users!leave_requests_employee_id_fkey(name)',
           )
           .eq('manager_id', managerId)
           .eq('status', 'pending');
@@ -135,7 +135,7 @@ class _ManagerApprovalScreenState extends State<ManagerApprovalScreen> {
                       title: Text(
                         '$userName: ${request['start_date']} → ${request['end_date']}',
                       ),
-                      subtitle: Text('Reason: ${request['reason']}'),
+
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

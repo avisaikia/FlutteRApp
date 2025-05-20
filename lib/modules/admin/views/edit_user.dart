@@ -16,11 +16,8 @@ class _EditUserScreenState extends State<EditUserScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late TextEditingController _passwordController;
-  bool _obscurePassword = true;
 
   String? _role;
-
   bool _loading = true;
   AdminUserModel? _user;
 
@@ -29,7 +26,6 @@ class _EditUserScreenState extends State<EditUserScreen> {
     super.initState();
     _nameController = TextEditingController();
     _emailController = TextEditingController();
-    _passwordController = TextEditingController();
     _loadUser();
   }
 
@@ -51,8 +47,6 @@ class _EditUserScreenState extends State<EditUserScreen> {
     _user = user;
     _nameController.text = user.name;
     _emailController.text = user.email;
-    _passwordController.text = user.password;
-
     _role = user.role;
 
     setState(() => _loading = false);
@@ -66,10 +60,8 @@ class _EditUserScreenState extends State<EditUserScreen> {
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       role: _role!,
-      password:
-          _passwordController.text.trim().isEmpty
-              ? _user!.password
-              : _passwordController.text.trim(),
+      // Password remains unchanged, so no update here
+      password: _user!.password,
     );
 
     await context.read<AdminRepository>().updateUser(updatedUser);
@@ -99,65 +91,123 @@ class _EditUserScreenState extends State<EditUserScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/users'),
         ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
       ),
+      backgroundColor: Colors.grey[50],
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Form(
           key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator:
-                    (val) => val == null || val.isEmpty ? 'Enter name' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator:
-                    (val) => val == null || val.isEmpty ? 'Enter email' : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _role,
-                decoration: const InputDecoration(labelText: 'Role'),
-                items: const [
-                  DropdownMenuItem(value: 'employee', child: Text('Employee')),
-                  DropdownMenuItem(value: 'manager', child: Text('Manager')),
-                ],
-                onChanged: (val) => setState(() => _role = val),
-                validator:
-                    (val) =>
-                        val == null || val.isEmpty ? 'Select a role' : null,
-              ),
-              const SizedBox(height: 24),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.shade50,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 3,
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                // Name
+                Text(
+                  'Name',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                obscureText: _obscurePassword,
-              ),
-              ElevatedButton(
-                onPressed: _updateUser,
-                child: const Text('Save Changes'),
-              ),
-            ],
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter name',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator:
+                      (val) => val == null || val.isEmpty ? 'Enter name' : null,
+                ),
+                const SizedBox(height: 24),
+
+                // Email
+                Text(
+                  'Email',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter email',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator:
+                      (val) =>
+                          val == null || val.isEmpty ? 'Enter email' : null,
+                ),
+                const SizedBox(height: 24),
+
+                // Role
+                Text(
+                  'Role',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: _role,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'employee',
+                      child: Text('Employee'),
+                    ),
+                    DropdownMenuItem(value: 'manager', child: Text('Manager')),
+                  ],
+                  onChanged: (val) => setState(() => _role = val),
+                  validator:
+                      (val) =>
+                          val == null || val.isEmpty ? 'Select a role' : null,
+                ),
+                const SizedBox(height: 32),
+
+                // Save Button
+                ElevatedButton(
+                  onPressed: _updateUser,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

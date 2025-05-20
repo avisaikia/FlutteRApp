@@ -5,12 +5,14 @@ class AdminSummaryCard extends StatelessWidget {
   final String value;
   final IconData icon;
   final VoidCallback? onTap;
+  final Color color;
 
   const AdminSummaryCard({
     super.key,
     required this.title,
     required this.value,
     required this.icon,
+    required this.color,
     this.onTap,
   });
 
@@ -19,10 +21,43 @@ class AdminSummaryCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Card(
-        child: ListTile(
-          leading: Icon(icon),
-          title: Text(title),
-          subtitle: Text(value),
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        color: color,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(icon, size: 32, color: Colors.white),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

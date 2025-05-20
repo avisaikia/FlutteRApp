@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart'; // for date formatting
 
 class EmployeeNotificationsScreen extends StatefulWidget {
   final String userId;
@@ -20,6 +22,7 @@ class EmployeeNotificationsScreen extends StatefulWidget {
 class _EmployeeNotificationsScreenState
     extends State<EmployeeNotificationsScreen> {
   final supabase = Supabase.instance.client;
+
   List<dynamic> _notifications = [];
   bool _isLoading = true;
 
@@ -53,6 +56,7 @@ class _EmployeeNotificationsScreenState
     fetchNotifications();
   }
 
+  // MARK ALL NOTIFICATIONS AS READ
   Future<void> markAllAsRead() async {
     await supabase
         .from('notifications')
@@ -62,6 +66,7 @@ class _EmployeeNotificationsScreenState
     fetchNotifications();
   }
 
+  // DELETE ALL NOTIFICATIONS
   Future<void> clearNotifications() async {
     await supabase
         .from('notifications')
@@ -69,6 +74,15 @@ class _EmployeeNotificationsScreenState
         .eq('recipient_id', widget.userId)
         .eq('role', 'employee');
     fetchNotifications();
+  }
+
+  String _formatTimestamp(String rawTimestamp) {
+    try {
+      final dt = DateTime.parse(rawTimestamp).toLocal();
+      return DateFormat('MMM d, yyyy – h:mm a').format(dt);
+    } catch (e) {
+      return rawTimestamp;
+    }
   }
 
   @override
@@ -154,11 +168,11 @@ class _EmployeeNotificationsScreenState
                   final item = _notifications[index];
                   final isRead = item['is_read'] ?? false;
                   final message = item['message'] ?? 'No message';
-                  final timestamp = DateTime.parse(item['timestamp']);
+                  final timestamp = _formatTimestamp(item['timestamp']);
 
                   return ListTile(
                     title: Text(message),
-                    subtitle: Text('${timestamp.toLocal()}'),
+                    subtitle: Text(timestamp),
                     tileColor: isRead ? Colors.white : Colors.blue[50],
                     trailing:
                         isRead

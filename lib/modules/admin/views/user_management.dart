@@ -13,13 +13,11 @@ class UserManagementScreen extends StatefulWidget {
 
 class _UserManagementScreenState extends State<UserManagementScreen>
     with SingleTickerProviderStateMixin {
-  late Future<List<AdminUserModel>> _usersFuture;
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _usersFuture = context.read<DashboardController>().fetchAllUsers();
     _tabController = TabController(length: 2, vsync: this);
   }
 
@@ -31,6 +29,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
 
   @override
   Widget build(BuildContext context) {
+    final dashboardController = context.watch<DashboardController>();
+
+    // Filter users by role dynamically
+    final employees =
+        dashboardController.allUsers
+            .where((user) => user.role.toLowerCase() == 'employee')
+            .toList();
+
+    final managers =
+        dashboardController.allUsers
+            .where((user) => user.role.toLowerCase() == 'manager')
+            .toList();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Management'),
@@ -43,29 +54,9 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           tabs: const [Tab(text: 'Employees'), Tab(text: 'Managers')],
         ),
       ),
-      body: FutureBuilder<List<AdminUserModel>>(
-        future: _usersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final allUsers = snapshot.data ?? [];
-          final employees =
-              allUsers
-                  .where((u) => u.role.toLowerCase() == 'employee')
-                  .toList();
-          final managers =
-              allUsers.where((u) => u.role.toLowerCase() == 'manager').toList();
-
-          return TabBarView(
-            controller: _tabController,
-            children: [_buildUserList(employees), _buildUserList(managers)],
-          );
-        },
+      body: TabBarView(
+        controller: _tabController,
+        children: [_buildUserList(employees), _buildUserList(managers)],
       ),
     );
   }
@@ -106,15 +97,54 @@ class _UserCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(user.email),
-        trailing: Chip(
-          label: Text(user.role),
-          backgroundColor:
-              user.role.toLowerCase() == 'manager'
-                  ? Colors.blue.shade100
-                  : Colors.green.shade100,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Chip(
+              label: Text(user.role),
+              backgroundColor:
+                  user.role.toLowerCase() == 'manager'
+                      ? Colors.blue.shade100
+                      : Colors.green.shade100,
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _confirmDelete(context),
+            ),
+          ],
         ),
-        onTap: () => context.go('/user-details/${user.id}'),
       ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Confirm Delete'),
+            content: Text('Are you sure you want to delete ${user.name}?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await context.read<DashboardController>().deleteUser(user.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${user.name} deleted')),
+                  );
+                },
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
     );
   }
 }
